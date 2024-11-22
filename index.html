@@ -8,29 +8,107 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.2/xlsx.full.min.js"></script> <!-- Biblioteca SheetJS -->
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="./favicon.png" type="image/png">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .form-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        input {
+            padding: 8px;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px;
+            font-size: 1rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .result-table table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+
+        .result-table th, .result-table td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+
+        .chart-container {
+            margin-top: 30px;
+        }
+
+    </style>
 </head>
 <body>
     <div class="container">
         <h1>Comparador de Pagamento vs CDB</h1>
         
         <!-- Formulário de Entrada -->
-        <label for="avista">Valor do Produto à Vista:</label>
-        <input type="number" id="avista" placeholder="Ex: 1500.50" step="0.01">
-        
-        <label for="total">Valor Total da Compra Parcelada:</label>
-        <input type="number" id="total" placeholder="Ex: 1800.75" step="0.01">
-        
-        <label for="parcelas">Número de Parcelas:</label>
-        <input type="number" id="parcelas" placeholder="Ex: 12" min="1">
-        
-        <label for="valor_parcela">Valor de Cada Parcela:</label>
-        <input type="number" id="valor_parcela" placeholder="Ex: 150.06" step="0.01">
-        
-        <label for="cdb_yield">Rendimento do CDB (% ao mês, opcional):</label>
-        <input type="number" id="cdb_yield" placeholder="Ex: 1.2" step="0.01">
+        <div class="form-container">
+            <label for="avista">Valor do Produto à Vista:</label>
+            <input type="number" id="avista" placeholder="Ex: 1500.50" step="0.01">
+            
+            <label for="total">Valor Total da Compra Parcelada:</label>
+            <input type="number" id="total" placeholder="Ex: 1800.75" step="0.01">
+            
+            <label for="parcelas">Número de Parcelas:</label>
+            <input type="number" id="parcelas" placeholder="Ex: 12" min="1">
+            
+            <label for="valor_parcela">Valor de Cada Parcela:</label>
+            <input type="number" id="valor_parcela" placeholder="Ex: 150.06" step="0.01">
+            
+            <label for="cdb_yield">Rendimento do CDB (% ao mês, opcional):</label>
+            <input type="number" id="cdb_yield" placeholder="Ex: 1.2" step="0.01">
 
-        <button onclick="comparePayments()">Comparar</button>
-        <button id="exportBtn">Exportar para Excel</button> <!-- Botão de exportação -->
+            <button onclick="comparePayments()">Comparar</button>
+            <button id="exportBtn">Exportar para Excel</button> <!-- Botão de exportação -->
+        </div>
 
         <!-- Tabela de Histórico -->
         <div class="result-table">
@@ -43,6 +121,8 @@
                         <th>Parcelas</th>
                         <th>Rendimento CDB</th>
                         <th>Melhor Opção</th>
+                        <th>Diferença (%)</th>
+                        <th>Diferença (R$)</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -88,6 +168,7 @@
                 alert("Por favor, insira um valor válido para o rendimento do CDB.");
                 return;
             }
+            
 
             // Calcular o rendimento do CDB para cada mês
             const rendimento_cdb = [];
@@ -103,6 +184,13 @@
             // Comparar a melhor opção: à vista com o rendimento ou parcelado
             const melhorOpcao = (avista + rendimento_cdb[rendimento_cdb.length - 1] <= totalParcelado) ? "À Vista" : "Parcelado";
 
+            // Calcular a diferença em porcentagem
+        const diferenca_percent = ((totalParcelado - avista) / avista) * 100;
+
+            // Calcular a diferença em reais
+            const diferenca_reais = totalParcelado - avista;
+
+
             // Adicionar ao histórico
             history.push({
                 avista: avista,
@@ -110,6 +198,8 @@
                 parcelas: parcelas,
                 cdb_yield: cdb_yield * 100,
                 melhorOpcao: melhorOpcao,
+                diferenca_percent: diferenca_percent.toFixed(2),
+            diferenca_reais: diferenca_reais.toFixed(2),
                 rendimento_cdb: rendimento_cdb
             });
 
@@ -136,6 +226,8 @@
                 row.insertCell(3).textContent = item.parcelas;
                 row.insertCell(4).textContent = `${item.cdb_yield.toFixed(2)}%`;
                 row.insertCell(5).textContent = item.melhorOpcao;
+                row.insertCell(6).textContent = `${item.diferenca_percent}%`;
+                row.insertCell(7).textContent = `R$ ${item.diferenca_reais}`;
             });
         }
 
@@ -175,60 +267,13 @@
             });
         }
 
-        // Função de exportação para Excel
-        function exportToExcel() {
-            // Verifica se existe algum dado no histórico
-            if (history.length === 0) {
-                alert("Não há dados no histórico para exportar.");
-                return;
-            }
-
-            const selectedRows = document.querySelectorAll('#history-table input[type="checkbox"]:checked');
-            const selectedHistory = [];
-
-            // Se nenhuma linha for selecionada, exibe um alerta
-            if (selectedRows.length === 0) {
-                alert("Selecione ao menos uma pesquisa do histórico para exportar.");
-                return;
-            }
-
-            // Coleta os dados das linhas selecionadas
-            selectedRows.forEach(checkbox => {
-                const index = checkbox.getAttribute('data-index');
-                selectedHistory.push(history[index]);
-            });
-
-            const data = [];
-            selectedHistory.forEach(item => {
-                const row = [
-                    item.avista.toFixed(2),
-                    item.total.toFixed(2),
-                    item.parcelas,
-                    item.cdb_yield.toFixed(2),
-                    item.melhorOpcao
-                ];
-                data.push(row);
-            });
-
-            // Adicionar dados do gráfico
-            const chartData = selectedHistory[0].rendimento_cdb.map((_, i) => ({
-                Mês: `Mês ${i + 1}`,
-                Rendimento: selectedHistory[0].rendimento_cdb[i].toFixed(2)
-            }));
-
-            // Criação do arquivo Excel
-            const wsHistory = XLSX.utils.aoa_to_sheet([['Valor à Vista', 'Valor Total Parcelado', 'Parcelas', 'Rendimento CDB', 'Melhor Opção'], ...data]);
-            const wsChart = XLSX.utils.json_to_sheet(chartData);
-
+        // Exportar histórico para Excel
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const ws = XLSX.utils.json_to_sheet(history);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, wsHistory, 'Histórico de Comparações');
-            XLSX.utils.book_append_sheet(wb, wsChart, 'Rendimento CDB');
-
-            XLSX.writeFile(wb, 'comparacoes_historico.xlsx');
-        }
-
-        // Vincular o botão de exportação
-        document.getElementById('exportBtn').addEventListener('click', exportToExcel);
+            XLSX.utils.book_append_sheet(wb, ws, "Histórico");
+            XLSX.writeFile(wb, "historico_comparacoes.xlsx");
+        });
     </script>
 </body>
 </html>
