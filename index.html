@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comparador de Pagamento vs CDB</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-	<link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.2/xlsx.full.min.js"></script> <!-- Biblioteca SheetJS -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="./favicon.png" type="image/png">
 </head>
 <body>
     <div class="container">
@@ -28,12 +30,14 @@
         <input type="number" id="cdb_yield" placeholder="Ex: 1.2" step="0.01">
 
         <button onclick="comparePayments()">Comparar</button>
+        <button id="exportBtn">Exportar para Excel</button> <!-- Botão de exportação -->
 
         <!-- Tabela de Histórico -->
         <div class="result-table">
             <table id="history-table">
                 <thead>
                     <tr>
+                        <th>Selecionar</th> <!-- Apenas a coluna para selecionar manualmente -->
                         <th>Valor à Vista</th>
                         <th>Valor Total Parcelado</th>
                         <th>Parcelas</th>
@@ -63,13 +67,41 @@
             const valor_parcela = parseFloat(document.getElementById("valor_parcela").value);
             const cdb_yield = parseFloat(document.getElementById("cdb_yield").value) / 100 || 0.012;
 
-            const rendimento_cdb = [];
-            for (let i = 1; i <= parcelas; i++) {
-                rendimento_cdb.push(avista * Math.pow(1 + cdb_yield, i) - avista);
+            // Verificar se algum valor está vazio ou inválido
+            if (isNaN(avista) || avista <= 0) {
+                alert("Por favor, insira um valor válido para o produto à vista.");
+                return;
+            }
+            if (isNaN(total) || total <= 0) {
+                alert("Por favor, insira um valor válido para o total parcelado.");
+                return;
+            }
+            if (isNaN(parcelas) || parcelas <= 0) {
+                alert("Por favor, insira um número válido de parcelas.");
+                return;
+            }
+            if (isNaN(valor_parcela) || valor_parcela <= 0) {
+                alert("Por favor, insira um valor válido para cada parcela.");
+                return;
+            }
+            if (isNaN(cdb_yield)) {
+                alert("Por favor, insira um valor válido para o rendimento do CDB.");
+                return;
             }
 
+            // Calcular o rendimento do CDB para cada mês
+            const rendimento_cdb = [];
+            let total_rendimento = 0;
+            for (let i = 1; i <= parcelas; i++) {
+                total_rendimento += avista * Math.pow(1 + cdb_yield, i) - avista;
+                rendimento_cdb.push(total_rendimento);
+            }
+
+            // Calcular o valor total das parcelas
             const totalParcelado = valor_parcela * parcelas;
-            const melhorOpcao = avista + rendimento_cdb[rendimento_cdb.length - 1] <= totalParcelado ? "À Vista" : "Parcelado";
+
+            // Comparar a melhor opção: à vista com o rendimento ou parcelado
+            const melhorOpcao = (avista + rendimento_cdb[rendimento_cdb.length - 1] <= totalParcelado) ? "À Vista" : "Parcelado";
 
             // Adicionar ao histórico
             history.push({
@@ -77,7 +109,8 @@
                 total: total,
                 parcelas: parcelas,
                 cdb_yield: cdb_yield * 100,
-                melhorOpcao: melhorOpcao
+                melhorOpcao: melhorOpcao,
+                rendimento_cdb: rendimento_cdb
             });
 
             updateHistoryTable();
@@ -88,13 +121,21 @@
         function updateHistoryTable() {
             const tbody = document.getElementById("history-table").getElementsByTagName('tbody')[0];
             tbody.innerHTML = '';
-            history.forEach(item => {
+            history.forEach((item, index) => {
                 const row = tbody.insertRow();
-                row.insertCell(0).textContent = `R$ ${item.avista.toFixed(2)}`;
-                row.insertCell(1).textContent = `R$ ${item.total.toFixed(2)}`;
-                row.insertCell(2).textContent = item.parcelas;
-                row.insertCell(3).textContent = `${item.cdb_yield.toFixed(2)}%`;
-                row.insertCell(4).textContent = item.melhorOpcao;
+                
+                // Checkbox para selecionar a linha manualmente
+                const cellSelect = row.insertCell(0);
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.setAttribute('data-index', index);
+                cellSelect.appendChild(checkbox);
+
+                row.insertCell(1).textContent = `R$ ${item.avista.toFixed(2)}`;
+                row.insertCell(2).textContent = `R$ ${item.total.toFixed(2)}`;
+                row.insertCell(3).textContent = item.parcelas;
+                row.insertCell(4).textContent = `${item.cdb_yield.toFixed(2)}%`;
+                row.insertCell(5).textContent = item.melhorOpcao;
             });
         }
 
@@ -133,6 +174,61 @@
                 }
             });
         }
+
+        // Função de exportação para Excel
+        function exportToExcel() {
+            // Verifica se existe algum dado no histórico
+            if (history.length === 0) {
+                alert("Não há dados no histórico para exportar.");
+                return;
+            }
+
+            const selectedRows = document.querySelectorAll('#history-table input[type="checkbox"]:checked');
+            const selectedHistory = [];
+
+            // Se nenhuma linha for selecionada, exibe um alerta
+            if (selectedRows.length === 0) {
+                alert("Selecione ao menos uma pesquisa do histórico para exportar.");
+                return;
+            }
+
+            // Coleta os dados das linhas selecionadas
+            selectedRows.forEach(checkbox => {
+                const index = checkbox.getAttribute('data-index');
+                selectedHistory.push(history[index]);
+            });
+
+            const data = [];
+            selectedHistory.forEach(item => {
+                const row = [
+                    item.avista.toFixed(2),
+                    item.total.toFixed(2),
+                    item.parcelas,
+                    item.cdb_yield.toFixed(2),
+                    item.melhorOpcao
+                ];
+                data.push(row);
+            });
+
+            // Adicionar dados do gráfico
+            const chartData = selectedHistory[0].rendimento_cdb.map((_, i) => ({
+                Mês: `Mês ${i + 1}`,
+                Rendimento: selectedHistory[0].rendimento_cdb[i].toFixed(2)
+            }));
+
+            // Criação do arquivo Excel
+            const wsHistory = XLSX.utils.aoa_to_sheet([['Valor à Vista', 'Valor Total Parcelado', 'Parcelas', 'Rendimento CDB', 'Melhor Opção'], ...data]);
+            const wsChart = XLSX.utils.json_to_sheet(chartData);
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, wsHistory, 'Histórico de Comparações');
+            XLSX.utils.book_append_sheet(wb, wsChart, 'Rendimento CDB');
+
+            XLSX.writeFile(wb, 'comparacoes_historico.xlsx');
+        }
+
+        // Vincular o botão de exportação
+        document.getElementById('exportBtn').addEventListener('click', exportToExcel);
     </script>
 </body>
 </html>
